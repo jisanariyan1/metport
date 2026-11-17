@@ -6,6 +6,8 @@
   <title>MEATPORT — Operations, Schedule & Direct Print System</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- html2canvas for High-Res Gallery Image Download -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <!-- Google Fonts: Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -118,6 +120,23 @@
       text-transform: uppercase;
     }
 
+    /* Staff Avatar Thumbnail */
+    .staff-thumb {
+      width: 32px;
+      height: 32px;
+      border-radius: 9999px;
+      object-fit: cover;
+      border: 1.5px solid #cbd5e1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #e2e8f0;
+      color: #1e293b;
+      font-weight: 800;
+      font-size: 11px;
+      overflow: hidden;
+    }
+
     /* Toast & Shake Animations */
     @keyframes slideUpFade {
       0% { opacity: 0; transform: translateY(16px); }
@@ -136,10 +155,10 @@
       animation: shakeError 0.35s ease-in-out;
     }
 
-    /* Direct A4 Print Rules */
+    /* Strictly Single-Page A4 Print Rules */
     @page {
       size: A4 portrait;
-      margin: 10mm;
+      margin: 7mm 8mm;
     }
 
     @media print {
@@ -151,6 +170,7 @@
         background: #ffffff !important;
         margin: 0 !important;
         padding: 0 !important;
+        height: auto !important;
       }
       .no-print {
         display: none !important;
@@ -162,15 +182,38 @@
       }
       .a4-sheet {
         width: 100% !important;
-        height: 277mm !important;
-        min-height: 277mm !important;
+        height: auto !important;
+        min-height: 266mm !important;
+        max-height: 274mm !important;
         margin: 0 !important;
-        padding: 2mm !important;
+        padding: 2mm 3mm !important;
         box-shadow: none !important;
         border: none !important;
         border-radius: 0 !important;
-        page-break-after: avoid;
-        break-inside: avoid;
+        overflow: hidden !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        page-break-after: avoid !important;
+        break-after: avoid !important;
+      }
+      .doc-table th,
+      .doc-table td {
+        padding: 4px 6px !important;
+        font-size: 8.5pt !important;
+      }
+      .doc-table th {
+        font-size: 8pt !important;
+      }
+      .sig-spacer {
+        padding-top: 14px !important;
+        padding-bottom: 2px !important;
+      }
+      .sal-sign-cell {
+        height: 6.5mm !important;
+      }
+      .staff-thumb {
+        width: 26px !important;
+        height: 26px !important;
       }
     }
   </style>
@@ -282,7 +325,7 @@
   <!-- =================================================================== -->
   <div id="app-container" class="hidden">
 
-    <!-- TOP NAVIGATION & SAVE/PRINT ACTION BAR (Hidden on Print) -->
+    <!-- TOP NAVIGATION & SAVE/IMAGE/PRINT ACTION BAR (Hidden on Print) -->
     <header class="no-print bg-slate-900 text-white shadow-lg sticky top-0 z-40">
       <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
         <!-- Brand Identity & Active User -->
@@ -304,7 +347,7 @@
           </div>
         </div>
 
-        <!-- Action Buttons: Staff Manager, Save, Backup, Direct Print, Logout -->
+        <!-- Action Buttons: Staff Manager, Save Data, Save Image (Gallery), Backup, Direct Print, Logout -->
         <div class="flex flex-wrap items-center gap-2">
           <button
             onclick="openStaffModal()"
@@ -318,12 +361,25 @@
 
           <button
             onclick="manualSaveAll()"
+            title="Save All Data"
             class="bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-semibold px-3 py-2 rounded-lg transition text-xs sm:text-sm flex items-center gap-1.5 shadow cursor-pointer"
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
             </svg>
             <span>Save</span>
+          </button>
+
+          <button
+            onclick="saveSheetAsImage()"
+            id="save-img-btn"
+            title="Download Sheet as Image to Gallery"
+            class="bg-purple-600 hover:bg-purple-500 active:scale-95 text-white font-bold px-3 py-2 rounded-lg transition text-xs sm:text-sm flex items-center gap-1.5 shadow cursor-pointer"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <span>Save Image</span>
           </button>
 
           <button
@@ -371,20 +427,23 @@
         </div>
       </div>
 
-      <!-- Schedule Tabs -->
+      <!-- Schedule Tabs (5 Tabs including Staff Information) -->
       <nav class="bg-slate-800 border-t border-slate-700">
         <div class="max-w-7xl mx-auto px-4 flex overflow-x-auto gap-1.5 py-2">
-          <button onclick="switchTab('duty')" id="tab-btn-duty" class="tab-btn px-4 py-2 rounded-lg text-xs sm:text-sm font-bold whitespace-nowrap transition bg-red-600 text-white shadow">
+          <button onclick="switchTab('duty')" id="tab-btn-duty" class="tab-btn px-4 py-2 rounded-lg text-xs sm:text-sm font-bold whitespace-nowrap transition bg-red-600 text-white shadow cursor-pointer">
             1. Daily Duty Schedule
           </button>
-          <button onclick="switchTab('housekeeping')" id="tab-btn-housekeeping" class="tab-btn px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition text-slate-300 hover:bg-slate-700">
+          <button onclick="switchTab('housekeeping')" id="tab-btn-housekeeping" class="tab-btn px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition text-slate-300 hover:bg-slate-700 cursor-pointer">
             2. Housekeeping Schedule
           </button>
-          <button onclick="switchTab('washroom')" id="tab-btn-washroom" class="tab-btn px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition text-slate-300 hover:bg-slate-700">
+          <button onclick="switchTab('washroom')" id="tab-btn-washroom" class="tab-btn px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition text-slate-300 hover:bg-slate-700 cursor-pointer">
             3. Washroom Clean Check-Out
           </button>
-          <button onclick="switchTab('salary')" id="tab-btn-salary" class="tab-btn px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition text-slate-300 hover:bg-slate-700">
+          <button onclick="switchTab('salary')" id="tab-btn-salary" class="tab-btn px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition text-slate-300 hover:bg-slate-700 cursor-pointer">
             4. Salary Schedule
+          </button>
+          <button onclick="switchTab('staffinfo')" id="tab-btn-staffinfo" class="tab-btn px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition text-slate-300 hover:bg-slate-700 cursor-pointer">
+            5. Staff Information
           </button>
         </div>
       </nav>
@@ -542,17 +601,34 @@
           </div>
         </div>
 
+        <!-- TAB 5 CONTROLS: Staff Information & Iqama Tracker Editor -->
+        <div id="controls-staffinfo" class="tab-controls hidden pt-4">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <div>
+              <h2 class="text-sm font-extrabold text-slate-800 uppercase tracking-wide">Staff Information, Photo &amp; Iqama Expiry Editor</h2>
+              <p class="text-xs text-slate-500">Edit Name, Upload Photo, Phone Number, Iqama Number, Iqama Expiry Date (auto-calculates remaining/expired days), and Email.</p>
+            </div>
+            <button onclick="openStaffModal()" class="bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-3.5 py-2 rounded-lg transition cursor-pointer">
+              + Add New Staff
+            </button>
+          </div>
+
+          <div id="staffinfo-editor-grid" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
       </section>
 
       <!-- =================================================================== -->
-      <!-- PRINTABLE A4 SHEETS (ONLY ACTIVE SHEET PRINTS ON A4 PORTRAIT)        -->
+      <!-- PRINTABLE A4 SHEETS (ONLY ACTIVE SHEET PRINTS ON SINGLE A4 PAGE)    -->
       <!-- =================================================================== -->
 
       <!-- SHEET 1: DAILY DUTY SCHEDULE -->
       <div id="sheet-duty" class="a4-sheet print-sheet">
         <div>
           <!-- Meatport Header -->
-          <div class="flex items-center justify-between border-b-2 border-red-700 pb-2.5 mb-3.5">
+          <div class="flex items-center justify-between border-b-2 border-red-700 pb-2 mb-3">
             <div>
               <h1 class="text-3xl font-extrabold text-red-700 tracking-wider uppercase leading-none">MEATPORT</h1>
               <p class="text-xs font-bold text-slate-700 mt-1 uppercase tracking-wide">Daily Staff Duty Roster &amp; Attendance Sheet</p>
@@ -565,7 +641,7 @@
           </div>
 
           <!-- Metadata Bar -->
-          <div class="bg-slate-50 border border-slate-300 rounded px-3.5 py-2 mb-3.5 flex flex-wrap justify-between items-center text-xs font-bold text-slate-700 gap-2">
+          <div class="bg-slate-50 border border-slate-300 rounded px-3.5 py-1.5 mb-3 flex flex-wrap justify-between items-center text-xs font-bold text-slate-700 gap-2">
             <div class="flex items-center gap-1.5">
               <span>MONTH:</span>
               <span class="out-month-boxes"></span>
@@ -575,10 +651,10 @@
           </div>
 
           <!-- Working Staff Table -->
-          <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider border-b border-slate-400 pb-1 mb-2">
+          <h2 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider border-b border-slate-400 pb-1 mb-1.5">
             Working Staff Schedule (Sorted by Shift)
           </h2>
-          <table class="doc-table mb-4">
+          <table class="doc-table mb-3">
             <thead>
               <tr>
                 <th style="width: 6%;">SL</th>
@@ -594,7 +670,7 @@
           </table>
 
           <!-- Weekly Off Day Table -->
-          <h2 class="text-xs font-extrabold text-red-800 uppercase tracking-wider border-b border-red-300 pb-1 mb-2">
+          <h2 class="text-xs font-extrabold text-red-800 uppercase tracking-wider border-b border-red-300 pb-1 mb-1.5">
             Weekly Off Day
           </h2>
           <table class="doc-table">
@@ -614,21 +690,21 @@
 
         <!-- Bottom Signatures -->
         <div>
-          <div class="grid grid-cols-2 gap-14 pt-8 pb-2">
+          <div class="grid grid-cols-2 gap-14 pt-6 pb-1.5 sig-spacer">
             <div class="text-center">
-              <div class="text-xs font-bold text-slate-700 h-5 out-incharge-val"></div>
+              <div class="text-xs font-bold text-slate-700 h-4 out-incharge-val"></div>
               <div class="border-t border-dashed border-slate-600 pt-1 text-xs font-bold text-slate-800">
                 In-Charge Signature
               </div>
             </div>
             <div class="text-center">
-              <div class="h-5"></div>
+              <div class="h-4"></div>
               <div class="border-t border-dashed border-slate-600 pt-1 text-xs font-bold text-slate-800">
                 Manager / Authorized Signature
               </div>
             </div>
           </div>
-          <div class="border-t border-slate-200 pt-1.5 flex justify-between text-[10px] text-slate-500">
+          <div class="border-t border-slate-200 pt-1 flex justify-between text-[10px] text-slate-500">
             <span>MEATPORT Operations Management</span>
             <span>Daily Duty Roster</span>
             <span>A4 Official Print</span>
@@ -640,7 +716,7 @@
       <div id="sheet-housekeeping" class="a4-sheet print-sheet hidden">
         <div>
           <!-- Meatport Header -->
-          <div class="flex items-center justify-between border-b-2 border-red-700 pb-2.5 mb-3.5">
+          <div class="flex items-center justify-between border-b-2 border-red-700 pb-2 mb-3">
             <div>
               <h1 class="text-3xl font-extrabold text-red-700 tracking-wider uppercase leading-none">MEATPORT</h1>
               <p class="text-xs font-bold text-slate-700 mt-1 uppercase tracking-wide">Housekeeping &amp; Floor Operations Schedule</p>
@@ -651,7 +727,7 @@
           </div>
 
           <!-- Month & Date Box -->
-          <div class="bg-slate-50 border border-slate-300 rounded px-3.5 py-2 mb-3.5 flex flex-wrap justify-between items-center text-xs font-bold text-slate-700 gap-2">
+          <div class="bg-slate-50 border border-slate-300 rounded px-3.5 py-1.5 mb-3 flex flex-wrap justify-between items-center text-xs font-bold text-slate-700 gap-2">
             <div class="flex items-center gap-1.5">
               <span>MONTH:</span>
               <span class="out-month-boxes"></span>
@@ -678,21 +754,21 @@
 
         <!-- Bottom Signatures -->
         <div>
-          <div class="grid grid-cols-2 gap-14 pt-8 pb-2">
+          <div class="grid grid-cols-2 gap-14 pt-6 pb-1.5 sig-spacer">
             <div class="text-center">
-              <div class="text-xs font-bold text-slate-700 h-5 out-incharge-val"></div>
+              <div class="text-xs font-bold text-slate-700 h-4 out-incharge-val"></div>
               <div class="border-t border-dashed border-slate-600 pt-1 text-xs font-bold text-slate-800">
                 In-Charge Signature
               </div>
             </div>
             <div class="text-center">
-              <div class="h-5"></div>
+              <div class="h-4"></div>
               <div class="border-t border-dashed border-slate-600 pt-1 text-xs font-bold text-slate-800">
                 Manager / Supervisor Signature
               </div>
             </div>
           </div>
-          <div class="border-t border-slate-200 pt-1.5 flex justify-between text-[10px] text-slate-500">
+          <div class="border-t border-slate-200 pt-1 flex justify-between text-[10px] text-slate-500">
             <span>MEATPORT Housekeeping &amp; Hygiene</span>
             <span>Standard Operating Schedule</span>
             <span>A4 Official Print</span>
@@ -704,7 +780,7 @@
       <div id="sheet-washroom" class="a4-sheet print-sheet hidden">
         <div>
           <!-- Meatport Header -->
-          <div class="flex items-center justify-between border-b-2 border-red-700 pb-2 mb-2.5">
+          <div class="flex items-center justify-between border-b-2 border-red-700 pb-2 mb-2">
             <div>
               <h1 class="text-3xl font-extrabold text-red-700 tracking-wider uppercase leading-none">MEATPORT</h1>
               <p class="text-xs font-bold text-slate-700 mt-1 uppercase tracking-wide">Washroom Clean Check-Out &amp; Inspection Log (12-Hour)</p>
@@ -715,7 +791,7 @@
           </div>
 
           <!-- Metadata Grid -->
-          <div class="bg-slate-50 border border-slate-300 rounded px-3 py-2 mb-2 grid grid-cols-3 gap-2 text-xs font-bold text-slate-700">
+          <div class="bg-slate-50 border border-slate-300 rounded px-3 py-1.5 mb-2 grid grid-cols-3 gap-2 text-xs font-bold text-slate-700">
             <div>DATE: <span class="border-b border-dashed border-slate-500 px-3"><span class="out-date">18</span> / <span class="out-month-short">__</span> / <span class="out-year">2026</span></span></div>
             <div class="flex items-center gap-1">
               <span>MONTH:</span>
@@ -727,7 +803,7 @@
           </div>
 
           <!-- Cleaning Checklist Summary -->
-          <div class="bg-slate-100 border-l-4 border-red-700 px-3 py-1.5 mb-2.5 text-[10.5px] text-slate-800">
+          <div class="bg-slate-100 border-l-4 border-red-700 px-3 py-1.5 mb-2 text-[10.5px] text-slate-800">
             <strong>Inspection Checklist:</strong>
             [1] Floor Dry &amp; Mopped &nbsp;|&nbsp;
             [2] Basin &amp; Mirror Spotless &nbsp;|&nbsp;
@@ -754,7 +830,7 @@
 
         <!-- Final Sign-off -->
         <div>
-          <div class="grid grid-cols-2 gap-14 pt-5 pb-1.5">
+          <div class="grid grid-cols-2 gap-14 pt-4 pb-1 sig-spacer">
             <div class="text-center">
               <div class="border-t border-dashed border-slate-600 pt-1 text-xs font-bold text-slate-800">
                 Cleaner Signature
@@ -778,7 +854,7 @@
       <div id="sheet-salary" class="a4-sheet print-sheet hidden">
         <div>
           <!-- Meatport Header -->
-          <div class="flex items-center justify-between border-b-2 border-red-700 pb-2.5 mb-3.5">
+          <div class="flex items-center justify-between border-b-2 border-red-700 pb-2 mb-3">
             <div>
               <h1 class="text-3xl font-extrabold text-red-700 tracking-wider uppercase leading-none">MEATPORT</h1>
               <p class="text-xs font-bold text-slate-700 mt-1 uppercase tracking-wide">Monthly Staff Salary Sheet &amp; Cash Handover Receipt</p>
@@ -789,7 +865,7 @@
           </div>
 
           <!-- Metadata Bar -->
-          <div class="bg-slate-50 border border-slate-300 rounded px-3.5 py-2 mb-3.5 flex justify-between items-center text-xs font-bold text-slate-700">
+          <div class="bg-slate-50 border border-slate-300 rounded px-3.5 py-1.5 mb-3 flex justify-between items-center text-xs font-bold text-slate-700">
             <div>DISBURSEMENT DATE: <span class="border-b border-dashed border-slate-500 px-3">___ / ___ / <span class="out-year">2026</span></span></div>
             <div>CURRENCY: <span id="out-sal-currency" class="text-slate-900">TK</span></div>
             <div>TOTAL STAFF: <span id="out-sal-count">10</span></div>
@@ -822,8 +898,9 @@
 
         <!-- Bottom Approvals -->
         <div>
-          <div class="grid grid-cols-3 gap-8 pt-8 pb-2">
+          <div class="grid grid-cols-3 gap-8 pt-6 pb-1.5 sig-spacer">
             <div class="text-center">
+              <div class="h-4"></div>
               <div class="border-t border-dashed border-slate-600 pt-1 text-xs font-bold text-slate-800">
                 Prepared By
               </div>
@@ -841,9 +918,72 @@
               </div>
             </div>
           </div>
-          <div class="border-t border-slate-200 pt-1.5 flex justify-between text-[10px] text-slate-500">
+          <div class="border-t border-slate-200 pt-1 flex justify-between text-[10px] text-slate-500">
             <span>MEATPORT Accounts &amp; Payroll</span>
             <span>Salary Handover Sheet</span>
+            <span>A4 Official Print</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SHEET 5: STAFF INFORMATION & IQAMA EXPIRY DIRECTORY -->
+      <div id="sheet-staffinfo" class="a4-sheet print-sheet hidden">
+        <div>
+          <!-- Meatport Header -->
+          <div class="flex items-center justify-between border-b-2 border-red-700 pb-2 mb-3">
+            <div>
+              <h1 class="text-3xl font-extrabold text-red-700 tracking-wider uppercase leading-none">MEATPORT</h1>
+              <p class="text-xs font-bold text-slate-700 mt-1 uppercase tracking-wide">Staff Information Directory &amp; Iqama Validity Register</p>
+            </div>
+            <div class="border-2 border-red-700 bg-red-50 text-red-800 px-3.5 py-1 rounded font-extrabold text-xs">
+              DATE: <span class="out-date">18</span> / <span class="out-month-short">__</span> / <span class="out-year">2026</span>
+            </div>
+          </div>
+
+          <!-- Summary Bar -->
+          <div class="bg-slate-50 border border-slate-300 rounded px-3.5 py-1.5 mb-3 flex flex-wrap justify-between items-center text-xs font-bold text-slate-700 gap-2">
+            <div>TOTAL REGISTERED STAFF: <span id="out-si-total" class="text-slate-900">10</span></div>
+            <div>VALID IQAMA: <span id="out-si-valid" class="text-emerald-700">0</span></div>
+            <div>EXPIRING SOON (&le;30D): <span id="out-si-soon" class="text-amber-700">0</span></div>
+            <div>EXPIRED: <span id="out-si-expired" class="text-red-700">0</span></div>
+          </div>
+
+          <!-- Staff Directory Table -->
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th style="width: 5%;">SL</th>
+                <th style="width: 7%;">Pic</th>
+                <th style="width: 21%; text-align: left;">Staff Name &amp; Role</th>
+                <th style="width: 15%;">Mobile Number</th>
+                <th style="width: 16%;">Iqama No.</th>
+                <th style="width: 18%;">Iqama Expiry &amp; Status</th>
+                <th style="width: 18%; text-align: left;">Email Address</th>
+              </tr>
+            </thead>
+            <tbody id="out-staffinfo-tbody"></tbody>
+          </table>
+        </div>
+
+        <!-- Bottom Signatures -->
+        <div>
+          <div class="grid grid-cols-2 gap-14 pt-6 pb-1.5 sig-spacer">
+            <div class="text-center">
+              <div class="text-xs font-bold text-slate-700 h-4 out-incharge-val"></div>
+              <div class="border-t border-dashed border-slate-600 pt-1 text-xs font-bold text-slate-800">
+                HR / In-Charge Signature
+              </div>
+            </div>
+            <div class="text-center">
+              <div class="h-4"></div>
+              <div class="border-t border-dashed border-slate-600 pt-1 text-xs font-bold text-slate-800">
+                Director / Manager Signature
+              </div>
+            </div>
+          </div>
+          <div class="border-t border-slate-200 pt-1 flex justify-between text-[10px] text-slate-500">
+            <span>MEATPORT HR &amp; Compliance Records</span>
+            <span>Confidential Staff Register</span>
             <span>A4 Official Print</span>
           </div>
         </div>
@@ -855,7 +995,7 @@
     <!-- CENTRAL STAFF MANAGER MODAL (Hidden on Print)                       -->
     <!-- =================================================================== -->
     <div id="staff-modal" class="no-print fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
-      <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-200">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full overflow-hidden border border-slate-200">
         <div class="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between">
           <div>
             <h3 class="font-extrabold text-base">Manage Meatport Staff</h3>
@@ -869,9 +1009,14 @@
         </div>
 
         <!-- Add New Staff Form -->
-        <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap gap-2">
-          <input type="text" id="modal-new-name" placeholder="Enter Staff Name" class="flex-1 min-w-[160px] px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold outline-none focus:border-red-500" />
-          <input type="text" id="modal-new-role" list="role-suggestions" placeholder="Designation (e.g. Front Helper)" class="flex-1 min-w-[160px] px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold outline-none focus:border-red-500" />
+        <div class="p-4 bg-slate-50 border-b border-slate-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+          <input type="text" id="modal-new-name" placeholder="Staff Name *" class="px-3 py-2 border border-slate-300 rounded-lg text-xs font-bold outline-none focus:border-red-500" />
+          <input type="text" id="modal-new-role" list="role-suggestions" placeholder="Designation" class="px-3 py-2 border border-slate-300 rounded-lg text-xs font-semibold outline-none focus:border-red-500" />
+          <input type="text" id="modal-new-phone" placeholder="Mobile Number" class="px-3 py-2 border border-slate-300 rounded-lg text-xs font-semibold outline-none focus:border-red-500" />
+          <input type="text" id="modal-new-iqama" placeholder="Iqama Number" class="px-3 py-2 border border-slate-300 rounded-lg text-xs font-semibold outline-none focus:border-red-500" />
+          <button onclick="addStaffFromModal()" class="bg-red-600 hover:bg-red-500 text-white font-bold px-4 py-2 rounded-lg text-xs transition cursor-pointer">
+            + Add Staff
+          </button>
           <datalist id="role-suggestions">
             <option value="Front Helper"></option>
             <option value="Kitchen Helper"></option>
@@ -879,9 +1024,6 @@
             <option value="Cleaner"></option>
             <option value="Shift In-Charge"></option>
           </datalist>
-          <button onclick="addStaffFromModal()" class="bg-red-600 hover:bg-red-500 text-white font-bold px-4 py-2 rounded-lg text-sm transition cursor-pointer">
-            + Add Staff
-          </button>
         </div>
 
         <!-- Existing Staff List -->
@@ -971,7 +1113,6 @@
       const errorBox = document.getElementById('login-error');
       const loginCard = document.getElementById('login-card');
 
-      // Case-insensitive ID match, exact secret key match
       const matchedUser = AUTHORIZED_USERS.find(
         u => u.id.toLowerCase() === idInput.toLowerCase() && u.key === keyInput
       );
@@ -979,7 +1120,7 @@
       if (!matchedUser) {
         errorBox.classList.remove('hidden');
         loginCard.classList.remove('shake-animate');
-        void loginCard.offsetWidth; // trigger reflow
+        void loginCard.offsetWidth;
         loginCard.classList.add('shake-animate');
         return;
       }
@@ -1040,16 +1181,16 @@
           incharge: ''
         },
         staff: [
-          { id: 1, name: 'Hemad', role: 'Front Helper', dutyShift: '10:30', hkTime: '', hkStatus: 'none', salaryBase: 1500, salaryAdj: 0, salaryStatus: 'Pending' },
-          { id: 2, name: 'Mahmud', role: 'Front Helper', dutyShift: 'OFF', hkTime: '', hkStatus: 'none', salaryBase: 1500, salaryAdj: 0, salaryStatus: 'Pending' },
-          { id: 3, name: 'Taybur', role: 'Kitchen Helper', dutyShift: '10:30', hkTime: '', hkStatus: 'none', salaryBase: 1500, salaryAdj: 0, salaryStatus: 'Pending' },
-          { id: 4, name: 'Shain', role: 'Kitchen Helper', dutyShift: '12:30', hkTime: '', hkStatus: 'none', salaryBase: 1500, salaryAdj: 0, salaryStatus: 'Pending' },
-          { id: 5, name: 'Jamal', role: 'Kitchen Helper', dutyShift: '01:30', hkTime: '', hkStatus: 'none', salaryBase: 1500, salaryAdj: 0, salaryStatus: 'Pending' },
-          { id: 6, name: 'Alom', role: 'Bar Helper', dutyShift: '12:30', hkTime: '', hkStatus: 'none', salaryBase: 1500, salaryAdj: 0, salaryStatus: 'Pending' },
-          { id: 7, name: 'Mohammad', role: 'Front Helper', dutyShift: '12:30', hkTime: '', hkStatus: 'none', salaryBase: 1500, salaryAdj: 0, salaryStatus: 'Pending' },
-          { id: 8, name: 'Ibrahim', role: 'Front Helper', dutyShift: '01:30', hkTime: '', hkStatus: 'none', salaryBase: 1500, salaryAdj: 0, salaryStatus: 'Pending' },
-          { id: 9, name: 'Noor', role: 'Kitchen Helper', dutyShift: '01:30', hkTime: '', hkStatus: 'none', salaryBase: 1500, salaryAdj: 0, salaryStatus: 'Pending' },
-          { id: 10, name: 'Minhaj', role: 'Front Helper', dutyShift: 'OFF', hkTime: '', hkStatus: 'none', salaryBase: 1500, salaryAdj: 0, salaryStatus: 'Pending' }
+          { id: 1, name: 'Hemad', role: 'Front Helper', dutyShift: '10:30', hkTime: '', hkStatus: 'none', salaryBase: 1500, salaryAdj: 0, salaryStatus: 'Pending', photo: '', phone: '', iqamaNumber: '', iqamaExpiry: '', email: '' },
+          { id: 2, name: 'Mahmud', role: 'Front Helper', dutyShift: 'OFF', hkTime: '', hkStatus: 'none', salaryBase: 1500, salaryAdj: 0, salaryStatus: 'Pending', photo: '', phone: '', iqamaNumber: '', iqamaExpiry: '', email: '' },
+          { id: 3, name: 'Taybur', role: 'Kitchen Helper', dutyShift: '10:30', hkTime: '', hkStatus: 'none', salaryBase: 1500, salaryAdj: 0, salaryStatus: 'Pending', photo: '', phone: '', iqamaNumber: '', iqamaExpiry: '', email: '' },
+          { id: 4, name: 'Shain', role: 'Kitchen Helper', dutyShift: '12:30', hkTime: '', hkStatus: 'none', salaryBase: 1500, salaryAdj: 0, salaryStatus: 'Pending', photo: '', phone: '', iqamaNumber: '', iqamaExpiry: '', email: '' },
+          { id: 5, name: 'Jamal', role: 'Kitchen Helper', dutyShift: '01:30', hkTime: '', hkStatus: 'none', salaryBase: 1500, salaryAdj: 0, salaryStatus: 'Pending', photo: '', phone: '', iqamaNumber: '', iqamaExpiry: '', email: '' },
+          { id: 6, name: 'Alom', role: 'Bar Helper', dutyShift: '12:30', hkTime: '', hkStatus: 'none', salaryBase: 1500, salaryAdj: 0, salaryStatus: 'Pending', photo: '', phone: '', iqamaNumber: '', iqamaExpiry: '', email: '' },
+          { id: 7, name: 'Mohammad', role: 'Front Helper', dutyShift: '12:30', hkTime: '', hkStatus: 'none', salaryBase: 1500, salaryAdj: 0, salaryStatus: 'Pending', photo: '', phone: '', iqamaNumber: '', iqamaExpiry: '', email: '' },
+          { id: 8, name: 'Ibrahim', role: 'Front Helper', dutyShift: '01:30', hkTime: '', hkStatus: 'none', salaryBase: 1500, salaryAdj: 0, salaryStatus: 'Pending', photo: '', phone: '', iqamaNumber: '', iqamaExpiry: '', email: '' },
+          { id: 9, name: 'Noor', role: 'Kitchen Helper', dutyShift: '01:30', hkTime: '', hkStatus: 'none', salaryBase: 1500, salaryAdj: 0, salaryStatus: 'Pending', photo: '', phone: '', iqamaNumber: '', iqamaExpiry: '', email: '' },
+          { id: 10, name: 'Minhaj', role: 'Front Helper', dutyShift: 'OFF', hkTime: '', hkStatus: 'none', salaryBase: 1500, salaryAdj: 0, salaryStatus: 'Pending', photo: '', phone: '', iqamaNumber: '', iqamaExpiry: '', email: '' }
         ],
         washroom: {
           cleaner: '',
@@ -1071,9 +1212,21 @@
         if (!raw) return getDefaultState();
         const parsed = JSON.parse(raw);
         const def = getDefaultState();
+        const mergedStaff = Array.isArray(parsed.staff)
+          ? parsed.staff.map(s => ({
+              photo: '',
+              phone: '',
+              iqamaNumber: '',
+              iqamaExpiry: '',
+              email: '',
+              ...s
+            }))
+          : def.staff;
+
         return {
           ...def,
           ...parsed,
+          staff: mergedStaff,
           meta: { ...def.meta, ...(parsed.meta || {}) },
           washroom: {
             ...def.washroom,
@@ -1100,12 +1253,80 @@
           showToast('All schedules & staff data saved successfully!', 'success');
         }
       } catch (e) {
-        showToast('Could not save to local storage.', 'error');
+        showToast('Storage limit reached! Try using smaller profile photos.', 'error');
       }
     }
 
     function manualSaveAll() {
       persistState(false);
+    }
+
+    // =====================================================================
+    // SAVE ACTIVE A4 SHEET AS HIGH-RESOLUTION GALLERY IMAGE (PNG)
+    // =====================================================================
+    async function saveSheetAsImage() {
+      const tab = appState.activeTab || 'duty';
+      const sheetEl = document.getElementById(`sheet-${tab}`);
+      const btn = document.getElementById('save-img-btn');
+
+      if (!sheetEl || typeof html2canvas === 'undefined') {
+        showToast('Image generator not ready. Please check internet connection.', 'error');
+        return;
+      }
+
+      const originalHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = `<span>Saving...</span>`;
+
+      try {
+        // Temporarily enforce desktop A4 proportions during capture so mobile downloads crisp A4 image
+        const prevWidth = sheetEl.style.width;
+        const prevMinHeight = sheetEl.style.minHeight;
+        const prevPadding = sheetEl.style.padding;
+        const prevBorderRadius = sheetEl.style.borderRadius;
+
+        sheetEl.style.width = '794px'; // exact 210mm at 96dpi
+        sheetEl.style.minHeight = '1123px'; // exact 297mm at 96dpi
+        sheetEl.style.padding = '36px 42px';
+        sheetEl.style.borderRadius = '0px';
+
+        const canvas = await html2canvas(sheetEl, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: '#ffffff',
+          logging: false
+        });
+
+        // Restore responsive styles immediately
+        sheetEl.style.width = prevWidth;
+        sheetEl.style.minHeight = prevMinHeight;
+        sheetEl.style.padding = prevPadding;
+        sheetEl.style.borderRadius = prevBorderRadius;
+
+        const dateTag = (appState.meta.date || 'sheet').replace(/[^a-zA-Z0-9_-]/g, '');
+        const fileName = `MEATPORT-${tab}-${dateTag}.png`;
+
+        canvas.toBlob(blob => {
+          if (!blob) {
+            showToast('Could not generate image file.', 'error');
+            return;
+          }
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = fileName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(() => URL.revokeObjectURL(url), 1500);
+          showToast(`Image saved (${fileName})! Check your Gallery / Downloads.`);
+        }, 'image/png', 1.0);
+      } catch (err) {
+        showToast('Failed to export image.', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+      }
     }
 
     function showToast(message, type = 'success') {
@@ -1122,7 +1343,7 @@
         toast.style.opacity = '0';
         toast.style.transition = 'opacity 0.3s ease';
         setTimeout(() => toast.remove(), 300);
-      }, 2800);
+      }, 3000);
     }
 
     // Export & Import JSON Backup
@@ -1239,13 +1460,132 @@
       document.querySelectorAll('.out-month-short').forEach(el => (el.textContent = m ? m.slice(0, 3).toUpperCase() : '__'));
       document.querySelectorAll('.out-incharge-val').forEach(el => (el.textContent = inc));
 
-      // Render Month Boxes: [__] [__] [__]
       const chars = m ? m.toUpperCase().split('') : ['__', '__', '__'];
       while (chars.length < 3) chars.push('__');
       const boxesHtml = `<span class="month-box-group">${chars
         .map(ch => `<span class="month-char-box">${escapeHtml(ch)}</span>`)
         .join('')}</span>`;
       document.querySelectorAll('.out-month-boxes').forEach(el => (el.innerHTML = boxesHtml));
+    }
+
+    // =====================================================================
+    // AUTOMATIC IQAMA EXPIRY DAY CALCULATOR
+    // =====================================================================
+    function getIqamaExpiryDetails(expiryDateStr) {
+      if (!expiryDateStr || !expiryDateStr.trim()) {
+        return {
+          status: 'unset',
+          days: null,
+          label: 'Not Set',
+          badgeClass: 'bg-slate-100 text-slate-500 border-slate-300',
+          printColor: '#64748b'
+        };
+      }
+
+      const parts = expiryDateStr.split('-');
+      if (parts.length !== 3) {
+        return {
+          status: 'unset',
+          days: null,
+          label: 'Invalid Date',
+          badgeClass: 'bg-slate-100 text-slate-500 border-slate-300',
+          printColor: '#64748b'
+        };
+      }
+
+      const expDate = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      const now = new Date();
+      const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const diffMs = expDate.getTime() - todayMidnight.getTime();
+      const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+      if (diffDays < 0) {
+        const ago = Math.abs(diffDays);
+        return {
+          status: 'expired',
+          days: diffDays,
+          label: `Expired ${ago} ${ago === 1 ? 'Day' : 'Days'} Ago`,
+          badgeClass: 'bg-red-100 text-red-800 border-red-300',
+          printColor: '#b91c1c'
+        };
+      } else if (diffDays === 0) {
+        return {
+          status: 'soon',
+          days: 0,
+          label: 'Expires Today!',
+          badgeClass: 'bg-red-100 text-red-800 border-red-300',
+          printColor: '#b91c1c'
+        };
+      } else if (diffDays <= 30) {
+        return {
+          status: 'soon',
+          days: diffDays,
+          label: `${diffDays} ${diffDays === 1 ? 'Day' : 'Days'} Left`,
+          badgeClass: 'bg-amber-100 text-amber-800 border-amber-300',
+          printColor: '#b45309'
+        };
+      } else {
+        return {
+          status: 'valid',
+          days: diffDays,
+          label: `${diffDays} Days Left`,
+          badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+          printColor: '#166534'
+        };
+      }
+    }
+
+    // Compress & Resize Staff Photo so localStorage stays fast and small
+    function handleStaffPhotoUpload(index, event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const img = new Image();
+        img.onload = function () {
+          const maxDim = 140;
+          let w = img.width;
+          let h = img.height;
+          if (w > h) {
+            if (w > maxDim) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            }
+          } else {
+            if (h > maxDim) {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+
+          appState.staff[index].photo = canvas.toDataURL('image/jpeg', 0.78);
+          persistState(true);
+          renderStaffInfoTab();
+          renderStaffModalList();
+          showToast(`Photo updated for ${appState.staff[index].name}!`);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removeStaffPhoto(index) {
+      appState.staff[index].photo = '';
+      persistState(true);
+      renderStaffInfoTab();
+      renderStaffModalList();
+      showToast('Photo removed.');
+    }
+
+    function getStaffInitials(name) {
+      const parts = String(name || 'S').trim().split(/\s+/);
+      return parts.slice(0, 2).map(p => p[0] ? p[0].toUpperCase() : '').join('') || 'S';
     }
 
     // Staff Manager Modal Operations
@@ -1265,8 +1605,18 @@
           (s, idx) => `
           <div class="flex flex-wrap items-center gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
             <span class="text-xs font-extrabold text-slate-400 w-5">${idx + 1}.</span>
-            <input type="text" value="${escapeHtml(s.name)}" onchange="updateStaffInfo(${idx}, 'name', this.value)" class="flex-1 min-w-[130px] px-2.5 py-1.5 bg-white border border-slate-300 rounded text-sm font-bold text-slate-900 outline-none focus:border-red-500" />
-            <input type="text" list="role-suggestions" value="${escapeHtml(s.role)}" onchange="updateStaffInfo(${idx}, 'role', this.value)" class="flex-1 min-w-[130px] px-2.5 py-1.5 bg-white border border-slate-300 rounded text-sm font-semibold text-slate-700 outline-none focus:border-red-500" />
+            <label class="cursor-pointer shrink-0" title="Upload Photo">
+              ${
+                s.photo
+                  ? `<img src="${s.photo}" alt="${escapeHtml(s.name)}" class="w-8 h-8 rounded-full object-cover border border-slate-300" />`
+                  : `<span class="w-8 h-8 rounded-full bg-slate-200 text-slate-700 font-extrabold text-xs inline-flex items-center justify-center border border-slate-300">${getStaffInitials(s.name)}</span>`
+              }
+              <input type="file" accept="image/*" onchange="handleStaffPhotoUpload(${idx}, event)" class="hidden" />
+            </label>
+            <input type="text" value="${escapeHtml(s.name)}" onchange="updateStaffInfo(${idx}, 'name', this.value)" placeholder="Name" class="flex-1 min-w-[115px] px-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs font-bold text-slate-900 outline-none focus:border-red-500" />
+            <input type="text" list="role-suggestions" value="${escapeHtml(s.role)}" onchange="updateStaffInfo(${idx}, 'role', this.value)" placeholder="Role" class="flex-1 min-w-[115px] px-2.5 py-1.5 bg-white border border-slate-300 rounded text-xs font-semibold text-slate-700 outline-none focus:border-red-500" />
+            <input type="text" value="${escapeHtml(s.phone || '')}" onchange="updateStaffInfo(${idx}, 'phone', this.value, true)" placeholder="Number" class="w-28 px-2 py-1.5 bg-white border border-slate-300 rounded text-xs font-semibold text-slate-700 outline-none focus:border-red-500" />
+            <input type="text" value="${escapeHtml(s.iqamaNumber || '')}" onchange="updateStaffInfo(${idx}, 'iqamaNumber', this.value, true)" placeholder="Iqama No" class="w-28 px-2 py-1.5 bg-white border border-slate-300 rounded text-xs font-semibold text-slate-700 outline-none focus:border-red-500" />
             <button onclick="deleteStaffMember(${idx})" title="Delete Staff" class="text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition cursor-pointer">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -1281,8 +1631,14 @@
     function addStaffFromModal() {
       const nameEl = document.getElementById('modal-new-name');
       const roleEl = document.getElementById('modal-new-role');
+      const phoneEl = document.getElementById('modal-new-phone');
+      const iqamaEl = document.getElementById('modal-new-iqama');
+
       const name = nameEl.value.trim();
       const role = roleEl.value.trim() || 'Helper';
+      const phone = phoneEl ? phoneEl.value.trim() : '';
+      const iqamaNumber = iqamaEl ? iqamaEl.value.trim() : '';
+
       if (!name) {
         showToast('Please enter a staff name.', 'error');
         return;
@@ -1296,18 +1652,25 @@
         hkStatus: 'none',
         salaryBase: Number(document.getElementById('sal-bulk-amount').value) || 1500,
         salaryAdj: 0,
-        salaryStatus: 'Pending'
+        salaryStatus: 'Pending',
+        photo: '',
+        phone,
+        iqamaNumber,
+        iqamaExpiry: '',
+        email: ''
       });
       nameEl.value = '';
+      if (phoneEl) phoneEl.value = '';
+      if (iqamaEl) iqamaEl.value = '';
       persistState(true);
       renderStaffModalList();
       renderAll();
       showToast(`${name} added to Meatport staff!`);
     }
 
-    function updateStaffInfo(index, field, value) {
+    function updateStaffInfo(index, field, value, allowEmpty = false) {
       const clean = value.trim();
-      if (!clean) return;
+      if (!clean && !allowEmpty) return;
       appState.staff[index][field] = clean;
       persistState(true);
       renderAll();
@@ -1362,7 +1725,6 @@
         })
         .join('');
 
-      // Sort working staff chronologically by shift time
       const timeToMinutes = t => {
         const match = String(t).match(/^(\d{1,2}):(\d{2})/);
         if (!match) return 9999;
@@ -1676,13 +2038,133 @@
               <td style="text-align: center; font-size: 8.5pt; font-weight: 700;">
                 <span class="check-sq">${isPaid ? '&#10003;' : ''}</span>${isPaid ? 'Paid' : 'Pending'}
               </td>
-              <td style="height: 10mm;"></td>
+              <td class="sal-sign-cell" style="height: 8mm;"></td>
             </tr>
           `;
         })
         .join('');
 
       document.getElementById('out-sal-grand-total').textContent = `${grandTotal.toLocaleString()} ${currency}`;
+    }
+
+    // =====================================================================
+    // TAB 5: STAFF INFORMATION & IQAMA EXPIRY COUNTDOWN RENDER & LOGIC
+    // =====================================================================
+    function renderStaffInfoTab() {
+      const grid = document.getElementById('staffinfo-editor-grid');
+      if (!grid) return;
+
+      let validCount = 0;
+      let soonCount = 0;
+      let expiredCount = 0;
+
+      grid.innerHTML = appState.staff
+        .map((s, idx) => {
+          const iqamaInfo = getIqamaExpiryDetails(s.iqamaExpiry);
+          if (iqamaInfo.status === 'valid') validCount++;
+          if (iqamaInfo.status === 'soon') soonCount++;
+          if (iqamaInfo.status === 'expired') expiredCount++;
+
+          const photoHtml = s.photo
+            ? `<img src="${s.photo}" alt="${escapeHtml(s.name)}" class="w-14 h-14 rounded-xl object-cover border-2 border-slate-300 shadow-xs" />`
+            : `<div class="w-14 h-14 rounded-xl bg-slate-200 text-slate-700 font-extrabold text-base flex items-center justify-center border-2 border-slate-300">${getStaffInitials(s.name)}</div>`;
+
+          return `
+            <div class="p-3.5 rounded-xl border border-slate-200 bg-slate-50/90 flex flex-col gap-3 shadow-2xs">
+              <!-- Top Row: Pic + Name + Role + Live Iqama Status Badge -->
+              <div class="flex items-start justify-between gap-3">
+                <div class="flex items-center gap-3">
+                  <div class="relative group">
+                    ${photoHtml}
+                    <label class="mt-1 block text-center text-[10px] font-bold text-blue-600 hover:underline cursor-pointer">
+                      ${s.photo ? 'Change Pic' : '+ Add Pic'}
+                      <input type="file" accept="image/*" onchange="handleStaffPhotoUpload(${idx}, event)" class="hidden" />
+                    </label>
+                    ${
+                      s.photo
+                        ? `<button type="button" onclick="removeStaffPhoto(${idx})" class="block mx-auto text-[9px] text-red-500 hover:underline cursor-pointer">Remove</button>`
+                        : ''
+                    }
+                  </div>
+                  <div class="space-y-1.5">
+                    <div>
+                      <label class="block text-[10px] font-bold text-slate-400 uppercase">Staff Name</label>
+                      <input type="text" value="${escapeHtml(s.name)}" onchange="updateStaffInfo(${idx}, 'name', this.value)" class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-sm font-extrabold text-slate-900 outline-none focus:border-red-500" />
+                    </div>
+                    <div>
+                      <label class="block text-[10px] font-bold text-slate-400 uppercase">Designation</label>
+                      <input type="text" list="role-suggestions" value="${escapeHtml(s.role)}" onchange="updateStaffInfo(${idx}, 'role', this.value)" class="w-full px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:border-red-500" />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Auto Calculated Remaining / Expired Days Badge -->
+                <div class="text-right shrink-0">
+                  <span class="block text-[9px] font-bold text-slate-400 uppercase mb-1">Iqama Validity</span>
+                  <span class="inline-block px-2.5 py-1 rounded-lg border text-xs font-extrabold ${iqamaInfo.badgeClass}">
+                    ${iqamaInfo.label}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Editable Details Grid: Phone Number, Iqama Number, Iqama Expiry Date, Email -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-slate-200/80">
+                <div>
+                  <label class="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Phone Number</label>
+                  <input type="text" value="${escapeHtml(s.phone || '')}" oninput="updateStaffInfo(${idx}, 'phone', this.value, true)" placeholder="e.g. 05XXXXXXXX" class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none focus:border-red-500" />
+                </div>
+                <div>
+                  <label class="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Iqama Number</label>
+                  <input type="text" value="${escapeHtml(s.iqamaNumber || '')}" oninput="updateStaffInfo(${idx}, 'iqamaNumber', this.value, true)" placeholder="e.g. 24XXXXXXXX" class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-800 outline-none focus:border-red-500" />
+                </div>
+                <div>
+                  <label class="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Iqama Expiry Date</label>
+                  <input type="date" value="${escapeHtml(s.iqamaExpiry || '')}" onchange="updateStaffInfo(${idx}, 'iqamaExpiry', this.value, true)" class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800 outline-none focus:border-red-500" />
+                </div>
+                <div>
+                  <label class="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Email Address</label>
+                  <input type="email" value="${escapeHtml(s.email || '')}" oninput="updateStaffInfo(${idx}, 'email', this.value, true)" placeholder="staff@meatport.com" class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:border-red-500" />
+                </div>
+              </div>
+            </div>
+          `;
+        })
+        .join('');
+
+      document.getElementById('out-si-total').textContent = appState.staff.length;
+      document.getElementById('out-si-valid').textContent = validCount;
+      document.getElementById('out-si-soon').textContent = soonCount;
+      document.getElementById('out-si-expired').textContent = expiredCount;
+
+      // Render Printable A4 Staff Information Table
+      document.getElementById('out-staffinfo-tbody').innerHTML = appState.staff
+        .map((s, idx) => {
+          const iqamaInfo = getIqamaExpiryDetails(s.iqamaExpiry);
+          const avatarPrint = s.photo
+            ? `<img src="${s.photo}" alt="${escapeHtml(s.name)}" class="staff-thumb mx-auto" />`
+            : `<span class="staff-thumb mx-auto">${getStaffInitials(s.name)}</span>`;
+
+          const expDateDisplay = s.iqamaExpiry ? escapeHtml(s.iqamaExpiry) : '—';
+
+          return `
+            <tr>
+              <td style="text-align: center; font-weight: 700;">${idx + 1}</td>
+              <td style="text-align: center;">${avatarPrint}</td>
+              <td>
+                <div style="font-weight: 800; color: #0f172a;">${escapeHtml(s.name)}</div>
+                <div style="font-size: 8pt; color: #475569;">${escapeHtml(s.role)}</div>
+              </td>
+              <td style="text-align: center; font-weight: 600;">${escapeHtml(s.phone || '—')}</td>
+              <td style="text-align: center; font-family: 'Courier New', monospace; font-weight: 700;">${escapeHtml(s.iqamaNumber || '—')}</td>
+              <td style="text-align: center;">
+                <div style="font-size: 8pt; font-weight: 700; color: #334155;">${expDateDisplay}</div>
+                <div style="font-size: 8pt; font-weight: 800; color: ${iqamaInfo.printColor};">${iqamaInfo.label}</div>
+              </td>
+              <td style="font-size: 8pt; word-break: break-all;">${escapeHtml(s.email || '—')}</td>
+            </tr>
+          `;
+        })
+        .join('');
     }
 
     // Security helper for HTML rendering
@@ -1700,6 +2182,7 @@
       renderHousekeepingTab();
       renderWashroomTab();
       renderSalaryTab();
+      renderStaffInfoTab();
     }
 
     function triggerDirectPrint() {
